@@ -1,7 +1,13 @@
 package top.daisy.template.filter;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import top.daisy.template.dao.TbTokenDAO;
+import top.daisy.template.entity.TbToken;
+import top.daisy.template.entity.TokenInfo;
+import top.daisy.template.util.IpUtil;
+import top.daisy.template.util.JsonUtil;
 
 import javax.servlet.*;
 import javax.servlet.annotation.WebFilter;
@@ -11,10 +17,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-@WebFilter(filterName = "DTokenFilter", urlPatterns = "/*")
+@WebFilter(filterName = "DTokenFilter", urlPatterns = "*.token")
 public class DTokenFilter implements Filter {
     private static final Logger logger = LoggerFactory.getLogger(DTokenFilter.class);
-    private Set<String> tokenSet = new HashSet<>();
+    private TbTokenDAO tbTokenDAO = new TbTokenDAO();
     public static final String REQUEST_TOKEN_NAME = "server_token";
 
     @Override
@@ -28,15 +34,36 @@ public class DTokenFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) servletRequest;
         String token = request.getParameter(REQUEST_TOKEN_NAME);
         token = token == null ? "" : token.trim();
-        //第二步，验证token是否存在
-        if ("".equals(token) || !tokenSet.contains(token)) {
-            token = UUID.randomUUID().toString();
-            tokenSet.add(token);
+        //默认是null
+        TbToken tbToken = null;
+
+        try {
+            //去数据库校验token是否存在
+            TbToken check = tbTokenDAO.queryByToken(token);
+            if (check == null) {
+                //不存在就新增加一个
+                token = UUID.randomUUID().toString();
+                tbToken = new TbToken();
+                TokenInfo tokenInfo = new TokenInfo();
+                tokenInfo.setIp(IpUtil.getIpAddr(request));
+                tbToken.setToken(token);
+                tbToken.setTokenInfo(JsonUtil.stringify(tokenInfo));
+                tbTokenDAO.Insert(tbToken);
+            } else {
+                //存在就更新ip信息
+                tbToken = check;
+                TokenInfo tokenInfo = check.content();
+                tokenInfo.setIp(IpUtil.getIpAddr(request));
+                tbToken.setTokenInfo(JsonUtil.stringify(tokenInfo));
+                tbTokenDAO.update(tbToken);
+            }
+        } catch (Exception e) {
+            throw new ServletException(e);
         }
-        //不存在就增加一个新的，并添加到token列表中，返回客户端
-        //存在就直接返回token给客户端
-        logger.debug("token信息：{}",token);
-        request.setAttribute(REQUEST_TOKEN_NAME,token);
+
+
+        logger.debug("token信息：{}", tbToken);
+        request.setAttribute(REQUEST_TOKEN_NAME, tbToken);
         filterChain.doFilter(servletRequest, servletResponse);
 
     }

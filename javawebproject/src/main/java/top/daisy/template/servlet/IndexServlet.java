@@ -12,8 +12,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 @WebServlet(name = "indexServlet",urlPatterns = "/index.action")
-public class indexServlet extends HttpServlet {
-    private static final Logger logger = LoggerFactory.getLogger(indexServlet.class);
+public class IndexServlet extends HttpServlet {
+    private static final Logger logger = LoggerFactory.getLogger(IndexServlet.class);
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         this.doPost(req, resp);
